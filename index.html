@@ -1,0 +1,776 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>선착순 주제 신청 시스템</title>
+    <!-- Tailwind CSS CDN -->
+    <script src="https://cdn.tailwindcss.com"></script>
+    <!-- Google Fonts Inter -->
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
+    <!-- FontAwesome for Icons -->
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+    <style>
+        body {
+            font-family: 'Inter', system-ui, -apple-system, sans-serif;
+        }
+        .custom-scrollbar::-webkit-scrollbar {
+            width: 6px;
+        }
+        .custom-scrollbar::-webkit-scrollbar-track {
+            background: #f1f1f1;
+            border-radius: 4px;
+        }
+        .custom-scrollbar::-webkit-scrollbar-thumb {
+            background: #cbd5e1;
+            border-radius: 4px;
+        }
+        .custom-scrollbar::-webkit-scrollbar-thumb:hover {
+            background: #94a3b8;
+        }
+    </style>
+</head>
+<body class="bg-slate-50 text-slate-800 min-h-screen flex flex-col">
+
+    <!-- Header Navigation -->
+    <header class="bg-indigo-600 text-white shadow-md sticky top-0 z-40">
+        <div class="max-w-6xl mx-auto px-4 py-4 flex justify-between items-center flex-wrap gap-3">
+            <div class="flex items-center space-x-3">
+                <i class="fa-solid fa-users-gear text-2xl"></i>
+                <div>
+                    <h1 class="text-xl font-bold tracking-tight">선착순 주제 신청 시스템</h1>
+                    <p id="viewRoleBadge" class="text-xs text-indigo-200">모드 확인 중...</p>
+                </div>
+            </div>
+            
+            <div class="flex items-center gap-2">
+                <!-- Share Button -->
+                <button onclick="openShareModal()" class="px-3 py-1.5 rounded-lg bg-indigo-500 hover:bg-indigo-400 text-white text-xs font-semibold shadow-sm transition-all flex items-center gap-1.5">
+                    <i class="fa-solid fa-share-nodes"></i> 링크 공유하기
+                </button>
+
+                <!-- Role Switcher (Hidden in pure Applicant Mode) -->
+                <div id="adminTabNav" class="flex bg-indigo-700 p-1 rounded-lg text-sm font-medium">
+                    <button id="tabApplicantBtn" onclick="setMode('applicant')" class="px-3 py-1 rounded-md bg-white text-indigo-700 text-xs sm:text-sm shadow-sm transition-all">신청자 모드</button>
+                    <button id="tabAdminBtn" onclick="attemptAdminAccess()" class="px-3 py-1 rounded-md text-indigo-100 hover:text-white text-xs sm:text-sm transition-all flex items-center gap-1">
+                        <i class="fa-solid fa-lock text-xs"></i> 관리자 모드
+                    </button>
+                </div>
+            </div>
+        </div>
+    </header>
+
+    <!-- Main Content Area -->
+    <main class="max-w-6xl mx-auto px-4 py-8 flex-1 w-full">
+
+        <!-- Custom Notification Message Box -->
+        <div id="toast" class="fixed top-5 right-5 z-50 transform transition-all duration-300 translate-y-[-100px] opacity-0 pointer-events-none">
+            <div id="toastContent" class="flex items-center space-x-3 bg-slate-900 text-white px-5 py-3.5 rounded-xl shadow-2xl border border-slate-700">
+                <i id="toastIcon" class="fa-solid fa-circle-info text-indigo-400"></i>
+                <span id="toastMessage" class="text-sm font-medium">알림 메시지</span>
+            </div>
+        </div>
+
+        <!-- Admin Password Auth Modal -->
+        <div id="adminAuthModal" class="fixed inset-0 bg-slate-900/60 backdrop-blur-sm z-50 flex items-center justify-center p-4 hidden">
+            <div class="bg-white rounded-2xl shadow-2xl max-w-sm w-full p-6 space-y-4 border border-slate-100">
+                <div class="text-center space-y-2">
+                    <div class="w-12 h-12 bg-indigo-50 text-indigo-600 rounded-full flex items-center justify-center mx-auto text-xl font-bold">
+                        <i class="fa-solid fa-lock"></i>
+                    </div>
+                    <h3 class="text-lg font-bold text-slate-900">관리자 인증</h3>
+                    <p class="text-xs text-slate-500">관리자 모드에 접근하려면 비밀번호를 입력하세요.<br><span class="text-[11px] text-indigo-500">(초기 비밀번호: 1234)</span></p>
+                </div>
+
+                <form onsubmit="verifyAdminPassword(event)" class="space-y-4">
+                    <div>
+                        <input type="password" id="adminPasswordInput" placeholder="비밀번호 입력" autocomplete="current-password" class="w-full px-4 py-2.5 bg-slate-50 border border-slate-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-indigo-500 text-sm text-center tracking-widest">
+                    </div>
+                    <div class="flex gap-2">
+                        <button type="button" onclick="closeAdminAuthModal()" class="w-1/2 py-2.5 bg-slate-100 hover:bg-slate-200 text-slate-600 rounded-xl text-xs font-semibold transition-all">취소</button>
+                        <button type="submit" class="w-1/2 py-2.5 bg-indigo-600 hover:bg-indigo-700 text-white rounded-xl text-xs font-semibold shadow-sm transition-all">확인</button>
+                    </div>
+                </form>
+            </div>
+        </div>
+
+        <!-- Share Modal Overlay -->
+        <div id="shareModal" class="fixed inset-0 bg-slate-900/50 backdrop-blur-sm z-50 flex items-center justify-center p-4 hidden">
+            <div class="bg-white rounded-2xl shadow-xl max-w-md w-full p-6 space-y-5">
+                <div class="flex justify-between items-center border-b pb-3">
+                    <h3 class="text-lg font-bold text-slate-900 flex items-center gap-2">
+                        <i class="fa-solid fa-link text-indigo-500"></i> 링크 공유하기
+                    </h3>
+                    <button onclick="closeShareModal()" class="text-slate-400 hover:text-slate-600">
+                        <i class="fa-solid fa-xmark text-lg"></i>
+                    </button>
+                </div>
+
+                <div class="space-y-4">
+                    <!-- Applicant Link Box -->
+                    <div class="p-4 bg-indigo-50 border border-indigo-100 rounded-xl">
+                        <div class="flex items-center justify-between mb-1">
+                            <span class="text-xs font-bold text-indigo-700">📌 신청자 전용 링크</span>
+                            <span class="text-[11px] bg-indigo-200 text-indigo-800 px-1.5 py-0.5 rounded font-semibold">설정창 완벽 숨김</span>
+                        </div>
+                        <p class="text-xs text-slate-500 mb-2">이름 입력란과 주제 신청/취소 버튼만 노출되는 링크입니다.</p>
+                        <div class="flex gap-2">
+                            <input type="text" id="shareApplicantUrlInput" readonly class="w-full text-xs bg-white border border-indigo-200 px-2.5 py-1.5 rounded-lg text-slate-600 select-all">
+                            <button onclick="copyShareLink('applicant')" class="bg-indigo-600 hover:bg-indigo-700 text-white px-3 py-1.5 rounded-lg text-xs font-semibold whitespace-nowrap transition-all flex items-center gap-1">
+                                <i class="fa-regular fa-copy"></i> 복사
+                            </button>
+                        </div>
+                    </div>
+
+                    <!-- Admin Link Box -->
+                    <div class="p-4 bg-slate-100 border border-slate-200 rounded-xl">
+                        <div class="flex items-center justify-between mb-1">
+                            <span class="text-xs font-bold text-slate-700">⚙️ 관리자용 링크</span>
+                            <span class="text-[11px] bg-slate-200 text-slate-700 px-1.5 py-0.5 rounded font-semibold">주제/정원 설정 포함</span>
+                        </div>
+                        <p class="text-xs text-slate-500 mb-2">주제 개수, 인원수 조절 및 명단 관리가 가능한 관리자 링크입니다.</p>
+                        <div class="flex gap-2">
+                            <input type="text" id="shareAdminUrlInput" readonly class="w-full text-xs bg-white border border-slate-200 px-2.5 py-1.5 rounded-lg text-slate-600 select-all">
+                            <button onclick="copyShareLink('admin')" class="bg-slate-800 hover:bg-slate-900 text-white px-3 py-1.5 rounded-lg text-xs font-semibold whitespace-nowrap transition-all flex items-center gap-1">
+                                <i class="fa-regular fa-copy"></i> 복사
+                            </button>
+                        </div>
+                    </div>
+                </div>
+
+                <div class="text-right">
+                    <button onclick="closeShareModal()" class="px-4 py-2 bg-slate-200 hover:bg-slate-300 text-slate-700 rounded-lg text-xs font-medium">닫기</button>
+                </div>
+            </div>
+        </div>
+
+        <!-- 1. APPLICANT VIEW -->
+        <section id="applicantSection" class="space-y-8">
+            <!-- User Login Header -->
+            <div class="bg-white p-6 rounded-2xl shadow-sm border border-slate-100 flex flex-col md:flex-row md:items-center justify-between gap-4">
+                <div class="space-y-1">
+                    <h2 class="text-lg font-bold text-slate-900 flex items-center gap-2">
+                        <i class="fa-solid fa-user-pen text-indigo-500"></i> 신청자 이름 입력
+                    </h2>
+                    <p class="text-sm text-slate-500">본인의 이름을 입력해야 원하는 주제에 신청할 수 있습니다.</p>
+                </div>
+                <div class="flex items-center gap-3">
+                    <input type="text" id="userNameInput" placeholder="이름 입력 (예: 홍길동)" class="px-4 py-2.5 bg-slate-50 border border-slate-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:bg-white text-sm w-full sm:w-64 transition-all">
+                    <button onclick="setUserName()" class="bg-indigo-600 hover:bg-indigo-700 text-white font-medium px-5 py-2.5 rounded-xl text-sm whitespace-nowrap shadow-sm transition-all">
+                        확인
+                    </button>
+                </div>
+            </div>
+
+            <!-- Current Application Banner -->
+            <div id="userStatusCard" class="hidden bg-emerald-50 border border-emerald-200 rounded-2xl p-5 flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4">
+                <div class="flex items-center space-x-3">
+                    <div class="w-10 h-10 rounded-full bg-emerald-500 text-white flex items-center justify-center font-bold text-lg shadow-sm">
+                        <i class="fa-solid fa-check"></i>
+                    </div>
+                    <div>
+                        <span class="text-xs font-semibold text-emerald-600 uppercase tracking-wider">신청 완료</span>
+                        <h3 class="text-base font-bold text-slate-800" id="userStatusText">신청 현황 표시</h3>
+                    </div>
+                </div>
+                <button onclick="cancelMyApplication()" class="w-full sm:w-auto px-4 py-2 bg-rose-500 hover:bg-rose-600 text-white text-sm font-medium rounded-xl transition-all shadow-sm flex items-center justify-center gap-2">
+                    <i class="fa-solid fa-xmark"></i> 신청 취소하기
+                </button>
+            </div>
+
+            <!-- Topics List Header -->
+            <div class="flex justify-between items-center">
+                <div>
+                    <h2 class="text-xl font-bold text-slate-900">신청 가능 주제 목록</h2>
+                    <p class="text-sm text-slate-500">원하는 주제를 선택하세요. 정원이 차면 마감됩니다.</p>
+                </div>
+                <div class="text-xs bg-indigo-50 text-indigo-700 px-3 py-1.5 rounded-full font-semibold border border-indigo-100 flex items-center gap-1.5">
+                    <span class="w-2 h-2 rounded-full bg-indigo-500 animate-pulse"></span>
+                    선착순 모집 중
+                </div>
+            </div>
+
+            <!-- Topics Cards Grid -->
+            <div id="topicsGrid" class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+                <!-- Topics rendered via JS -->
+            </div>
+        </section>
+
+        <!-- 2. ADMIN VIEW -->
+        <section id="adminSection" class="hidden space-y-8">
+            <!-- Password Change Bar -->
+            <div class="bg-indigo-900 text-white p-5 rounded-2xl shadow-sm flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4">
+                <div class="space-y-0.5">
+                    <h3 class="text-sm font-bold flex items-center gap-2">
+                        <i class="fa-solid fa-shield-halved text-indigo-300"></i> 관리자 보안 설정
+                    </h3>
+                    <p class="text-xs text-indigo-200">관리자 모드 접근 시 필요한 비밀번호를 변경할 수 있습니다.</p>
+                </div>
+                <div class="flex items-center gap-2 w-full sm:w-auto">
+                    <input type="password" id="newPasswordInput" placeholder="새 비밀번호 입력" class="px-3 py-1.5 bg-indigo-800 border border-indigo-700 rounded-lg text-xs text-white placeholder-indigo-300 focus:outline-none focus:ring-2 focus:ring-indigo-400 w-full sm:w-44">
+                    <button onclick="changeAdminPassword()" class="px-3.5 py-1.5 bg-indigo-500 hover:bg-indigo-400 text-white text-xs font-semibold rounded-lg whitespace-nowrap transition-all shadow-sm">
+                        비밀번호 변경
+                    </button>
+                </div>
+            </div>
+
+            <!-- Setup Form -->
+            <div class="bg-white p-6 rounded-2xl shadow-sm border border-slate-100 space-y-6">
+                <div class="border-b border-slate-100 pb-4">
+                    <h2 class="text-lg font-bold text-slate-900 flex items-center gap-2">
+                        <i class="fa-solid fa-sliders text-indigo-500"></i> 주제 및 정원 설정
+                    </h2>
+                    <p class="text-sm text-slate-500">주제의 개수와 각 주제별 최대 지정 정원 인원수를 작성하세요.</p>
+                </div>
+
+                <div class="grid grid-cols-1 md:grid-cols-2 gap-6">
+                    <div>
+                        <label class="block text-sm font-semibold text-slate-700 mb-2">주제 개수 (몇 개)</label>
+                        <input type="number" id="topicCountInput" min="1" max="20" value="3" class="w-full px-4 py-2.5 bg-slate-50 border border-slate-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:bg-white text-sm">
+                    </div>
+                    <div>
+                        <label class="block text-sm font-semibold text-slate-700 mb-2">주제별 배정 정원 (몇 명씩)</label>
+                        <input type="number" id="capacityInput" min="1" max="100" value="3" class="w-full px-4 py-2.5 bg-slate-50 border border-slate-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:bg-white text-sm">
+                    </div>
+                </div>
+
+                <button onclick="generateTopicInputs()" class="w-full bg-slate-800 hover:bg-slate-900 text-white font-medium py-2.5 rounded-xl text-sm transition-all shadow-sm">
+                    주제 이름 입력칸 만들기
+                </button>
+            </div>
+
+            <!-- Topic Names Form -->
+            <div id="topicDetailContainer" class="bg-white p-6 rounded-2xl shadow-sm border border-slate-100 space-y-6">
+                <div class="border-b border-slate-100 pb-4">
+                    <h2 class="text-lg font-bold text-slate-900">각 주제의 이름 작성</h2>
+                    <p class="text-sm text-slate-500">각 주제의 명칭을 입력하고 모집을 개시하세요.</p>
+                </div>
+
+                <div id="topicInputsList" class="grid grid-cols-1 md:grid-cols-2 gap-4">
+                    <!-- Dynamic topic name inputs -->
+                </div>
+
+                <div class="flex gap-3 pt-2">
+                    <button onclick="startRecruitment()" class="flex-1 bg-indigo-600 hover:bg-indigo-700 text-white font-semibold py-3 rounded-xl text-sm transition-all shadow-md">
+                        <i class="fa-solid fa-play mr-1"></i> 이 설정으로 선착순 모집 개시하기
+                    </button>
+                </div>
+            </div>
+
+            <!-- Admin Overview -->
+            <div class="bg-white p-6 rounded-2xl shadow-sm border border-slate-100 space-y-6">
+                <div class="flex justify-between items-center border-b border-slate-100 pb-4 flex-wrap gap-2">
+                    <div>
+                        <h2 class="text-lg font-bold text-slate-900">전체 주제 현황 및 신청자 관리</h2>
+                        <p class="text-sm text-slate-500">주제별 신청 등록 명단을 확인하고 취소시킬 수 있습니다.</p>
+                    </div>
+                    <div class="flex items-center gap-2">
+                        <button onclick="downloadApplicantsExcel()" class="px-3.5 py-1.5 text-xs font-semibold text-emerald-700 bg-emerald-50 hover:bg-emerald-100 border border-emerald-200 rounded-lg transition-all flex items-center gap-1.5 shadow-sm">
+                            <i class="fa-solid fa-file-excel text-emerald-600"></i> 엑셀로 다운로드
+                        </button>
+                        <button onclick="resetAllData()" class="px-3 py-1.5 text-xs font-semibold text-rose-600 bg-rose-50 hover:bg-rose-100 rounded-lg transition-all">
+                            <i class="fa-solid fa-rotate-left mr-1"></i> 신청자 명단 초기화
+                        </button>
+                    </div>
+                </div>
+
+                <div id="adminStatusList" class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+                    <!-- Admin status cards -->
+                </div>
+            </div>
+        </section>
+
+    </main>
+
+    <!-- Footer -->
+    <footer class="bg-white border-t border-slate-200 mt-auto py-6">
+        <div class="max-w-6xl mx-auto px-4 text-center text-xs text-slate-400">
+            © 선착순 주제 신청 관리 시스템
+        </div>
+    </footer>
+
+    <!-- JavaScript Core -->
+    <script>
+        // Data State
+        let appState = {
+            capacityPerTopic: 3,
+            adminPassword: '1234', // Default password
+            topics: [
+                { id: 1, name: '주제 1 (예: 팀 프로젝트 A)', applicants: [] },
+                { id: 2, name: '주제 2 (예: 팀 프로젝트 B)', applicants: [] },
+                { id: 3, name: '주제 3 (예: 팀 프로젝트 C)', applicants: [] }
+            ],
+            currentUser: ''
+        };
+
+        let currentMode = 'applicant'; // 'applicant' or 'admin'
+        let isAdminAuthenticated = false;
+
+        // Initialization
+        window.onload = function () {
+            loadFromLocalStorage();
+
+            // Hash detection logic
+            const hash = window.location.hash;
+            if (hash === '#applicant') {
+                currentMode = 'applicant';
+                document.getElementById('adminTabNav').classList.add('hidden');
+                setMode('applicant');
+            } else if (hash === '#admin') {
+                document.getElementById('adminTabNav').classList.remove('hidden');
+                attemptAdminAccess();
+            } else {
+                currentMode = 'applicant';
+                document.getElementById('adminTabNav').classList.remove('hidden');
+                setMode('applicant');
+            }
+
+            // Populate form inputs
+            document.getElementById('topicCountInput').value = appState.topics.length;
+            document.getElementById('capacityInput').value = appState.capacityPerTopic;
+
+            generateTopicInputs();
+        };
+
+        // Local Storage Sync
+        function saveToLocalStorage() {
+            localStorage.setItem('firstComeState_v2', JSON.stringify(appState));
+        }
+
+        function loadFromLocalStorage() {
+            const saved = localStorage.getItem('firstComeState_v2');
+            if (saved) {
+                try {
+                    const parsed = JSON.parse(saved);
+                    appState = { ...appState, ...parsed };
+                    if (!appState.adminPassword) appState.adminPassword = '1234';
+                    if (appState.currentUser) {
+                        document.getElementById('userNameInput').value = appState.currentUser;
+                    }
+                } catch (e) {
+                    console.error(e);
+                }
+            }
+        }
+
+        // Admin Auth Logic
+        function attemptAdminAccess() {
+            if (isAdminAuthenticated) {
+                setMode('admin');
+            } else {
+                document.getElementById('adminPasswordInput').value = '';
+                document.getElementById('adminAuthModal').classList.remove('hidden');
+                setTimeout(() => document.getElementById('adminPasswordInput').focus(), 100);
+            }
+        }
+
+        function closeAdminAuthModal() {
+            document.getElementById('adminAuthModal').classList.add('hidden');
+            if (currentMode !== 'admin') {
+                setMode('applicant');
+            }
+        }
+
+        function verifyAdminPassword(e) {
+            e.preventDefault();
+            const inputPw = document.getElementById('adminPasswordInput').value.trim();
+            if (inputPw === appState.adminPassword) {
+                isAdminAuthenticated = true;
+                closeAdminAuthModal();
+                setMode('admin');
+                showToast('관리자로 인증되었습니다.', 'success');
+            } else {
+                showToast('비밀번호가 올바르지 않습니다.', 'error');
+            }
+        }
+
+        function changeAdminPassword() {
+            const newPw = document.getElementById('newPasswordInput').value.trim();
+            if (!newPw) {
+                showToast('새 비밀번호를 입력해주세요.', 'error');
+                return;
+            }
+            appState.adminPassword = newPw;
+            saveToLocalStorage();
+            document.getElementById('newPasswordInput').value = '';
+            showToast('관리자 비밀번호가 새로 변경되었습니다.', 'success');
+        }
+
+        // Mode Switching
+        function setMode(mode) {
+            currentMode = mode;
+            const applicantSec = document.getElementById('applicantSection');
+            const adminSec = document.getElementById('adminSection');
+            const applicantBtn = document.getElementById('tabApplicantBtn');
+            const adminBtn = document.getElementById('tabAdminBtn');
+            const badge = document.getElementById('viewRoleBadge');
+
+            if (mode === 'applicant') {
+                applicantSec.classList.remove('hidden');
+                adminSec.classList.add('hidden');
+                badge.innerText = '신청자 전용 화면';
+                if (applicantBtn) applicantBtn.className = "px-3 py-1 rounded-md bg-white text-indigo-700 text-xs sm:text-sm shadow-sm font-bold";
+                if (adminBtn) adminBtn.className = "px-3 py-1 rounded-md text-indigo-100 hover:text-white text-xs sm:text-sm flex items-center gap-1";
+                renderApplicantView();
+            } else {
+                applicantSec.classList.add('hidden');
+                adminSec.classList.remove('hidden');
+                badge.innerText = '관리자 설정 모드 (보안 인증됨)';
+                if (applicantBtn) applicantBtn.className = "px-3 py-1 rounded-md text-indigo-100 hover:text-white text-xs sm:text-sm";
+                if (adminBtn) adminBtn.className = "px-3 py-1 rounded-md bg-white text-indigo-700 text-xs sm:text-sm shadow-sm font-bold flex items-center gap-1";
+                renderAdminView();
+            }
+        }
+
+        // Toast Messages
+        function showToast(msg, type = 'info') {
+            const toast = document.getElementById('toast');
+            const toastMessage = document.getElementById('toastMessage');
+            const toastIcon = document.getElementById('toastIcon');
+
+            toastMessage.innerText = msg;
+            toastIcon.className = type === 'success' ? 'fa-solid fa-circle-check text-emerald-400' :
+                                  type === 'error' ? 'fa-solid fa-circle-exclamation text-rose-400' :
+                                  'fa-solid fa-circle-info text-indigo-400';
+
+            toast.classList.remove('translate-y-[-100px]', 'opacity-0', 'pointer-events-none');
+            toast.classList.add('translate-y-0', 'opacity-100');
+
+            setTimeout(() => {
+                toast.classList.remove('translate-y-0', 'opacity-100');
+                toast.classList.add('translate-y-[-100px]', 'opacity-0', 'pointer-events-none');
+            }, 3000);
+        }
+
+        // Share Link Modal
+        function openShareModal() {
+            // Clean base URL without any previous hashes or query parameters
+            const baseUrl = window.location.origin + window.location.pathname;
+            document.getElementById('shareApplicantUrlInput').value = `${baseUrl}#applicant`;
+            document.getElementById('shareAdminUrlInput').value = `${baseUrl}#admin`;
+            document.getElementById('shareModal').classList.remove('hidden');
+        }
+
+        function closeShareModal() {
+            document.getElementById('shareModal').classList.add('hidden');
+        }
+
+        function copyShareLink(target) {
+            const inputId = target === 'applicant' ? 'shareApplicantUrlInput' : 'shareAdminUrlInput';
+            const input = document.getElementById(inputId);
+            const textToCopy = input.value;
+
+            // Select input text for fallback
+            input.select();
+            input.setSelectionRange(0, 99999);
+
+            if (navigator.clipboard && window.isSecureContext) {
+                navigator.clipboard.writeText(textToCopy).then(() => {
+                    showToast(target === 'applicant' ? '신청자 전용 링크가 복사되었습니다!' : '관리자용 링크가 복사되었습니다!', 'success');
+                }).catch(() => {
+                    document.execCommand('copy');
+                    showToast(target === 'applicant' ? '신청자 전용 링크가 복사되었습니다!' : '관리자용 링크가 복사되었습니다!', 'success');
+                });
+            } else {
+                document.execCommand('copy');
+                showToast(target === 'applicant' ? '신청자 전용 링크가 복사되었습니다!' : '관리자용 링크가 복사되었습니다!', 'success');
+            }
+
+            closeShareModal();
+        }
+
+        // Name Handlers
+        function setUserName() {
+            const name = document.getElementById('userNameInput').value.trim();
+            if (!name) {
+                showToast('이름을 입력해주세요.', 'error');
+                return;
+            }
+            appState.currentUser = name;
+            saveToLocalStorage();
+            showToast(`'${name}'님 반갑습니다. 원하시는 주제를 신청해주세요.`, 'success');
+            renderApplicantView();
+        }
+
+        // Application Actions
+        function applyForTopic(topicId) {
+            if (!appState.currentUser) {
+                showToast('상단에서 먼저 이름(아이디)을 입력 후 [확인]을 눌러주세요.', 'error');
+                document.getElementById('userNameInput').focus();
+                return;
+            }
+
+            // Check if user already applied somewhere
+            const currentApplied = appState.topics.find(t => t.applicants.includes(appState.currentUser));
+            if (currentApplied) {
+                showToast(`이미 '${currentApplied.name}' 주제에 신청되어 있습니다. 기존 신청을 취소 후 신청하세요.`, 'error');
+                return;
+            }
+
+            const target = appState.topics.find(t => t.id === topicId);
+            if (!target) return;
+
+            // Capacity Check (First Come First Served)
+            if (target.applicants.length >= appState.capacityPerTopic) {
+                showToast('정원이 채워져 마감되었습니다. 다른 주제를 선택해 주세요.', 'error');
+                renderApplicantView();
+                return;
+            }
+
+            target.applicants.push(appState.currentUser);
+            saveToLocalStorage();
+            showToast(`[${target.name}] 선착순 신청 완료!`, 'success');
+            renderApplicantView();
+        }
+
+        function cancelMyApplication() {
+            if (!appState.currentUser) return;
+
+            let topicName = '';
+            appState.topics.forEach(topic => {
+                const idx = topic.applicants.indexOf(appState.currentUser);
+                if (idx !== -1) {
+                    topic.applicants.splice(idx, 1);
+                    topicName = topic.name;
+                }
+            });
+
+            if (topicName) {
+                saveToLocalStorage();
+                showToast(`[${topicName}] 신청이 취소되었습니다. 다시 선택 가능합니다.`, 'info');
+                renderApplicantView();
+            }
+        }
+
+        function cancelUserByAdmin(topicId, userName) {
+            const topic = appState.topics.find(t => t.id === topicId);
+            if (!topic) return;
+
+            const idx = topic.applicants.indexOf(userName);
+            if (idx !== -1) {
+                topic.applicants.splice(idx, 1);
+                saveToLocalStorage();
+                showToast(`${userName}님의 신청을 취소 처리했습니다.`, 'info');
+                renderAdminView();
+                renderApplicantView();
+            }
+        }
+
+        // Render Functions
+        function renderApplicantView() {
+            const grid = document.getElementById('topicsGrid');
+            const statusCard = document.getElementById('userStatusCard');
+            const statusText = document.getElementById('userStatusText');
+
+            grid.innerHTML = '';
+
+            let appliedTopic = null;
+            if (appState.currentUser) {
+                appliedTopic = appState.topics.find(t => t.applicants.includes(appState.currentUser));
+            }
+
+            if (appliedTopic) {
+                statusCard.classList.remove('hidden');
+                statusText.innerText = `${appState.currentUser}님은 현재 [${appliedTopic.name}] 주제에 신청되어 있습니다.`;
+            } else {
+                statusCard.classList.add('hidden');
+            }
+
+            appState.topics.forEach((topic, idx) => {
+                const isFull = topic.applicants.length >= appState.capacityPerTopic;
+                const isMyTopic = appliedTopic && appliedTopic.id === topic.id;
+                const percentage = Math.round((topic.applicants.length / appState.capacityPerTopic) * 100);
+
+                const card = document.createElement('div');
+                card.className = `bg-white rounded-2xl p-6 border transition-all duration-200 flex flex-col justify-between ${
+                    isMyTopic 
+                    ? 'border-emerald-500 ring-2 ring-emerald-100 shadow-md' 
+                    : isFull 
+                    ? 'border-slate-200 bg-slate-50/70' 
+                    : 'border-slate-200 hover:shadow-lg hover:border-indigo-300'
+                }`;
+
+                let btnHTML = '';
+                if (isMyTopic) {
+                    btnHTML = `
+                        <button onclick="cancelMyApplication()" class="w-full bg-slate-100 hover:bg-rose-50 text-rose-600 border border-slate-200 font-semibold py-3 px-4 rounded-xl text-sm transition-all flex items-center justify-center gap-2">
+                            <i class="fa-solid fa-rotate-left"></i> 신청 취소하기
+                        </button>`;
+                } else if (isFull) {
+                    btnHTML = `
+                        <button disabled class="w-full bg-slate-200 text-slate-500 font-bold py-3 px-4 rounded-xl text-sm cursor-not-allowed flex items-center justify-center gap-2">
+                            <i class="fa-solid fa-lock"></i> [마감] 정원 초과
+                        </button>`;
+                } else {
+                    btnHTML = `
+                        <button onclick="applyForTopic(${topic.id})" class="w-full bg-indigo-600 hover:bg-indigo-700 text-white font-semibold py-3 px-4 rounded-xl text-sm transition-all shadow-sm flex items-center justify-center gap-2">
+                            <i class="fa-solid fa-paper-plane"></i> 선착순 신청하기
+                        </button>`;
+                }
+
+                card.innerHTML = `
+                    <div>
+                        <div class="flex justify-between items-start mb-3">
+                            <span class="text-xs font-bold px-2.5 py-1 bg-indigo-50 text-indigo-700 rounded-lg">주제 ${idx + 1}</span>
+                            ${
+                                isFull 
+                                ? '<span class="px-2.5 py-1 bg-rose-100 text-rose-700 text-xs font-bold rounded-full">마감됨</span>'
+                                : `<span class="px-2.5 py-1 bg-emerald-100 text-emerald-700 text-xs font-bold rounded-full">${appState.capacityPerTopic - topic.applicants.length}명 남음</span>`
+                            }
+                        </div>
+                        <h3 class="text-lg font-bold text-slate-900 mb-2 leading-snug">${topic.name}</h3>
+                        
+                        <div class="mt-4 mb-6">
+                            <div class="flex justify-between text-xs text-slate-500 mb-1.5">
+                                <span>신청 현황</span>
+                                <span class="font-semibold text-slate-700">${topic.applicants.length} / ${appState.capacityPerTopic}명 (${percentage}%)</span>
+                            </div>
+                            <div class="w-full bg-slate-100 rounded-full h-2.5 overflow-hidden">
+                                <div class="h-2.5 rounded-full transition-all duration-500 ${isFull ? 'bg-rose-500' : 'bg-indigo-600'}" style="width: ${percentage}%"></div>
+                            </div>
+                        </div>
+                    </div>
+                    <div>${btnHTML}</div>
+                `;
+
+                grid.appendChild(card);
+            });
+        }
+
+        function renderAdminView() {
+            const listContainer = document.getElementById('adminStatusList');
+            listContainer.innerHTML = '';
+
+            appState.topics.forEach((topic, idx) => {
+                const isFull = topic.applicants.length >= appState.capacityPerTopic;
+                const card = document.createElement('div');
+                card.className = "bg-slate-50 border border-slate-200 rounded-xl p-4 flex flex-col justify-between";
+
+                let applicantsListHTML = '';
+                if (topic.applicants.length === 0) {
+                    applicantsListHTML = `<li class="text-xs text-slate-400 py-2 text-center italic">신청자가 없습니다.</li>`;
+                } else {
+                    applicantsListHTML = topic.applicants.map((name, i) => `
+                        <li class="flex justify-between items-center text-sm py-1.5 px-2.5 bg-white rounded-lg border border-slate-100 shadow-sm">
+                            <span class="font-medium text-slate-700"><span class="text-xs text-slate-400 mr-2">${i+1}.</span>${name}</span>
+                            <button onclick="cancelUserByAdmin(${topic.id}, '${name}')" class="text-xs text-rose-500 hover:text-rose-700 p-1" title="신청 취소">
+                                <i class="fa-solid fa-xmark"></i>
+                            </button>
+                        </li>
+                    `).join('');
+                }
+
+                card.innerHTML = `
+                    <div>
+                        <div class="flex justify-between items-center mb-2">
+                            <h4 class="font-bold text-slate-800 text-base">${idx + 1}. ${topic.name}</h4>
+                            <span class="text-xs font-semibold px-2 py-0.5 rounded ${isFull ? 'bg-rose-100 text-rose-700' : 'bg-indigo-100 text-indigo-700'}">
+                                ${topic.applicants.length} / ${appState.capacityPerTopic}명
+                            </span>
+                        </div>
+                        <ul class="space-y-1.5 mt-3 max-h-48 overflow-y-auto custom-scrollbar pr-1">
+                            ${applicantsListHTML}
+                        </ul>
+                    </div>
+                `;
+
+                listContainer.appendChild(card);
+            });
+        }
+
+        // Admin Helpers
+        function generateTopicInputs() {
+            const count = parseInt(document.getElementById('topicCountInput').value) || 1;
+            const container = document.getElementById('topicInputsList');
+            container.innerHTML = '';
+
+            for (let i = 1; i <= count; i++) {
+                const existingName = appState.topics[i - 1] ? appState.topics[i - 1].name : `주제 ${i}`;
+                const div = document.createElement('div');
+                div.innerHTML = `
+                    <label class="block text-xs font-semibold text-slate-600 mb-1">주제 ${i} 이름 작성</label>
+                    <input type="text" id="topicName_${i}" value="${existingName}" placeholder="예: 주제 명칭 입력" class="topic-name-field w-full px-3 py-2 bg-slate-50 border border-slate-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500">
+                `;
+                container.appendChild(div);
+            }
+        }
+
+        function startRecruitment() {
+            const capacity = parseInt(document.getElementById('capacityInput').value) || 1;
+            const fields = document.querySelectorAll('.topic-name-field');
+
+            const newTopics = [];
+            fields.forEach((field, idx) => {
+                newTopics.push({
+                    id: idx + 1,
+                    name: field.value.trim() || `주제 ${idx + 1}`,
+                    applicants: []
+                });
+            });
+
+            appState.capacityPerTopic = capacity;
+            appState.topics = newTopics;
+
+            saveToLocalStorage();
+            showToast('새로운 주제 및 정원 설정으로 모집이 개시되었습니다!', 'success');
+            
+            renderAdminView();
+            renderApplicantView();
+        }
+
+        function resetAllData() {
+            if (confirm('현재 신청한 모든 신청자 명단을 초기화하시겠습니까?')) {
+                appState.topics.forEach(t => t.applicants = []);
+                saveToLocalStorage();
+                showToast('신청자 명단이 초기화되었습니다.', 'info');
+                renderAdminView();
+                renderApplicantView();
+            }
+        }
+
+        // Export Applicants to Excel (CSV with UTF-8 BOM)
+        function downloadApplicantsExcel() {
+            let totalApplicants = 0;
+            appState.topics.forEach(t => totalApplicants += t.applicants.length);
+
+            if (totalApplicants === 0) {
+                showToast('다운로드할 신청자 명단 데이터가 없습니다.', 'error');
+                return;
+            }
+
+            // Generate CSV content with UTF-8 BOM (\uFEFF for Excel Korean encoding)
+            let csvContent = "\uFEFF";
+            csvContent += "주제 번호,주제명,신청 순번,신청자 이름,최대 정원,모집 상태\n";
+
+            appState.topics.forEach((topic, idx) => {
+                const isFull = topic.applicants.length >= appState.capacityPerTopic;
+                const statusStr = isFull ? "마감" : "모집중";
+
+                if (topic.applicants.length === 0) {
+                    csvContent += `"${idx + 1}","${topic.name.replace(/"/g, '""')}","-","신청자 없음","${appState.capacityPerTopic}","${statusStr}"\n`;
+                } else {
+                    topic.applicants.forEach((applicantName, seq) => {
+                        csvContent += `"${idx + 1}","${topic.name.replace(/"/g, '""')}","${seq + 1}","${applicantName.replace(/"/g, '""')}","${appState.capacityPerTopic}","${statusStr}"\n`;
+                    });
+                }
+            });
+
+            // Create Blob and Trigger Download
+            const blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8;' });
+            const url = URL.createObjectURL(blob);
+            const link = document.createElement("a");
+            
+            const today = new Date();
+            const dateStr = today.toISOString().slice(0, 10);
+            
+            link.setAttribute("href", url);
+            link.setAttribute("download", `선착순_주제_신청명단_${dateStr}.csv`);
+            document.body.appendChild(link);
+            link.click();
+            document.body.removeChild(link);
+
+            showToast('신청자 명단 엑셀(CSV) 파일이 다운로드되었습니다.', 'success');
+        }
+    </script>
+</body>
+</html>
